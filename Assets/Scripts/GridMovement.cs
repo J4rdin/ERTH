@@ -179,37 +179,76 @@ public class GridMovement : MonoBehaviour
         }
     }
 
-    private List<Vector2Int> GetReachableCells(Vector2Int start, int maxSteps)
+    //SQUARE MAP: Phazed out for test
+    //private List<Vector2Int> GetReachableCells(Vector2Int start, int maxSteps)
+    //{
+    //    List<Vector2Int> reachable = new List<Vector2Int>();
+    //    if (maxSteps <= 0 || gridManager == null)
+    //        return reachable;
+
+    //    Queue<(Vector2Int cell, int steps)> queue = new Queue<(Vector2Int, int)>();
+    //    HashSet<Vector2Int> visited = new HashSet<Vector2Int> { start };
+    //    queue.Enqueue((start, 0));
+
+    //    while (queue.Count > 0)
+    //    {
+    //        var (current, steps) = queue.Dequeue();
+    //        if (steps >= maxSteps)
+    //            continue;
+
+    //        foreach (Vector2Int neighbor in GetNeighbors(current))
+    //        {
+    //            if (visited.Contains(neighbor))
+    //                continue;
+
+    //            if (gridManager.IsCellBlocked(neighbor))
+    //            {
+    //                visited.Add(neighbor);
+    //                continue;
+    //            }
+
+    //            visited.Add(neighbor);
+    //            int nextSteps = steps + 1;
+    //            reachable.Add(neighbor);
+    //            queue.Enqueue((neighbor, nextSteps));
+    //        }
+    //    }
+
+    //    return reachable;
+    //}
+
+    public List<Vector2Int> GetReachableCells(Vector2Int startCell, int maxRange)
     {
         List<Vector2Int> reachable = new List<Vector2Int>();
-        if (maxSteps <= 0 || gridManager == null)
-            return reachable;
+        if (gridManager == null || maxRange <= 0) return reachable;
 
-        Queue<(Vector2Int cell, int steps)> queue = new Queue<(Vector2Int, int)>();
-        HashSet<Vector2Int> visited = new HashSet<Vector2Int> { start };
-        queue.Enqueue((start, 0));
+        Queue<(Vector2Int cell, int cost)> queue = new Queue<(Vector2Int, int)>();
+        Dictionary<Vector2Int, int> bestCost = new Dictionary<Vector2Int, int>();
+
+        queue.Enqueue((startCell, 0));
+        bestCost[startCell] = 0;
 
         while (queue.Count > 0)
         {
-            var (current, steps) = queue.Dequeue();
-            if (steps >= maxSteps)
-                continue;
+            var (current, costSoFar) = queue.Dequeue();
 
-            foreach (Vector2Int neighbor in GetNeighbors(current))
+            if (current != startCell)
             {
-                if (visited.Contains(neighbor))
-                    continue;
+                reachable.Add(current);
+            }
 
-                if (gridManager.IsCellBlocked(neighbor))
+            if (costSoFar >= maxRange) continue;
+
+            foreach (Vector2Int next in GetNeighbors(current))
+            {
+                if (gridManager.IsCellBlocked(next)) continue;
+
+                int nextCost = costSoFar + 1;
+                if (!bestCost.TryGetValue(next, out int existingCost) || nextCost < existingCost)
                 {
-                    visited.Add(neighbor);
-                    continue;
+                    bestCost[next] = nextCost;
+                    queue.Enqueue((next, nextCost));
                 }
-
-                visited.Add(neighbor);
-                int nextSteps = steps + 1;
-                reachable.Add(neighbor);
-                queue.Enqueue((neighbor, nextSteps));
             }
         }
 
@@ -386,67 +425,113 @@ public class GridMovement : MonoBehaviour
         return path;
     }
 
+    //SQUARE MAP: Phazed out for test
+    //private IEnumerable<Vector2Int> GetNeighbors(Vector2Int pos)
+    //{
+    //    Vector2Int[] cardinals =
+    //    {
+    //        new Vector2Int(pos.x + 1, pos.y),
+    //        new Vector2Int(pos.x - 1, pos.y),
+    //        new Vector2Int(pos.x, pos.y + 1),
+    //        new Vector2Int(pos.x, pos.y - 1)
+    //    };
+
+    //    foreach (Vector2Int c in cardinals)
+    //    {
+    //        if (IsWithinGridBounds(c))
+    //            yield return c;
+    //    }
+
+    //    if (allowDiagonalSteps)
+    //    {
+    //        Vector2Int[] diagonals =
+    //        {
+    //            new Vector2Int(pos.x + 1, pos.y + 1),
+    //            new Vector2Int(pos.x - 1, pos.y + 1),
+    //            new Vector2Int(pos.x + 1, pos.y - 1),
+    //            new Vector2Int(pos.x - 1, pos.y - 1)
+    //        };
+
+    //        foreach (Vector2Int d in diagonals)
+    //        {
+    //            if (!IsWithinGridBounds(d))
+    //                continue;
+
+    //            Vector2Int sideA = new Vector2Int(d.x, pos.y);
+    //            Vector2Int sideB = new Vector2Int(pos.x, d.y);
+    //            if (gridManager.IsCellBlocked(sideA) && gridManager.IsCellBlocked(sideB))
+    //                continue;
+
+    //            yield return d;
+    //        }
+    //    }
+    //}
+
     private IEnumerable<Vector2Int> GetNeighbors(Vector2Int pos)
     {
-        Vector2Int[] cardinals =
-        {
-            new Vector2Int(pos.x + 1, pos.y),
-            new Vector2Int(pos.x - 1, pos.y),
-            new Vector2Int(pos.x, pos.y + 1),
-            new Vector2Int(pos.x, pos.y - 1)
-        };
+        bool isOddRow = (pos.y % 2) == 1;
 
-        foreach (Vector2Int c in cardinals)
-        {
-            if (IsWithinGridBounds(c))
-                yield return c;
-        }
+        Vector2Int[] offsets = isOddRow
+            ? new Vector2Int[]
+              {
+              new Vector2Int(pos.x + 1, pos.y),     // Right
+              new Vector2Int(pos.x - 1, pos.y),     // Left
+              new Vector2Int(pos.x,     pos.y + 1), // Top-Left
+              new Vector2Int(pos.x + 1, pos.y + 1), // Top-Right
+              new Vector2Int(pos.x,     pos.y - 1), // Bottom-Left
+              new Vector2Int(pos.x + 1, pos.y - 1)  // Bottom-Right
+              }
+            : new Vector2Int[]
+              {
+              new Vector2Int(pos.x + 1, pos.y),     // Right
+              new Vector2Int(pos.x - 1, pos.y),     // Left
+              new Vector2Int(pos.x - 1, pos.y + 1), // Top-Left
+              new Vector2Int(pos.x,     pos.y + 1), // Top-Right
+              new Vector2Int(pos.x - 1, pos.y - 1), // Bottom-Left
+              new Vector2Int(pos.x,     pos.y - 1)  // Bottom-Right
+              };
 
-        if (allowDiagonalSteps)
+        foreach (Vector2Int n in offsets)
         {
-            Vector2Int[] diagonals =
+            if (n.x >= 0 && n.x < gridManager.width && n.y >= 0 && n.y < gridManager.height)
             {
-                new Vector2Int(pos.x + 1, pos.y + 1),
-                new Vector2Int(pos.x - 1, pos.y + 1),
-                new Vector2Int(pos.x + 1, pos.y - 1),
-                new Vector2Int(pos.x - 1, pos.y - 1)
-            };
-
-            foreach (Vector2Int d in diagonals)
-            {
-                if (!IsWithinGridBounds(d))
-                    continue;
-
-                Vector2Int sideA = new Vector2Int(d.x, pos.y);
-                Vector2Int sideB = new Vector2Int(pos.x, d.y);
-                if (gridManager.IsCellBlocked(sideA) && gridManager.IsCellBlocked(sideB))
-                    continue;
-
-                yield return d;
+                yield return n;
             }
         }
     }
 
+    //SQUARE MAP: Phazed out for test
+    //private int GetMoveCost(Vector2Int from, Vector2Int to)
+    //{
+    //    int dx = Mathf.Abs(to.x - from.x);
+    //    int dz = Mathf.Abs(to.y - from.y);
+    //    return (dx + dz == 2) ? 14 : 10;
+    //}
+
+    //private int GetHeuristic(Vector2Int a, Vector2Int b)
+    //{
+    //    int dx = Mathf.Abs(a.x - b.x);
+    //    int dz = Mathf.Abs(a.y - b.y);
+
+    //    if (allowDiagonalSteps)
+    //    {
+    //        int diag = Mathf.Min(dx, dz);
+    //        int straight = Mathf.Abs(dx - dz);
+    //        return 14 * diag + 10 * straight;
+    //    }
+
+    //    return 10 * (dx + dz);
+    //}
+
     private int GetMoveCost(Vector2Int from, Vector2Int to)
     {
-        int dx = Mathf.Abs(to.x - from.x);
-        int dz = Mathf.Abs(to.y - from.y);
-        return (dx + dz == 2) ? 14 : 10;
+        return 10;
     }
 
     private int GetHeuristic(Vector2Int a, Vector2Int b)
     {
-        int dx = Mathf.Abs(a.x - b.x);
-        int dz = Mathf.Abs(a.y - b.y);
-
-        if (allowDiagonalSteps)
-        {
-            int diag = Mathf.Min(dx, dz);
-            int straight = Mathf.Abs(dx - dz);
-            return 14 * diag + 10 * straight;
-        }
-
-        return 10 * (dx + dz);
+        // Manhattan distance in offset rows/cols works as an admissible A* heuristic
+        return 10 * (Mathf.Abs(a.x - b.x) + Mathf.Abs(a.y - b.y));
     }
 
     private IEnumerator FollowTilePath(List<Vector2Int> path)

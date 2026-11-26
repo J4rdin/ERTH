@@ -131,42 +131,43 @@ public class GridManager : MonoBehaviour
         Debug.Log($"[GridManager] Generated {spawnedTiles.Count} tiles ({blockedCells.Count} blocked).");
     }
 
-    private void CreateTileVisual(Vector2Int cell, float groundY)
-    {
-        Vector3 tilePos = new Vector3(
-            gridOrigin.x + (cell.x + 0.5f) * cellSize,
-            groundY + tileHeightOffset,
-            gridOrigin.z + (cell.y + 0.5f) * cellSize
-        );
+    //SQUARE MAP: Phazed out for test
+    //private void CreateTileVisual(Vector2Int cell, float groundY)
+    //{
+    //    Vector3 tilePos = new Vector3(
+    //        gridOrigin.x + (cell.x + 0.5f) * cellSize,
+    //        groundY + tileHeightOffset,
+    //        gridOrigin.z + (cell.y + 0.5f) * cellSize
+    //    );
 
-        GameObject tile = GameObject.CreatePrimitive(PrimitiveType.Quad);
-        tile.name = $"Tile_{cell.x}_{cell.y}";
-        tile.transform.SetParent(transform);
-        tile.transform.position = tilePos;
-        tile.transform.rotation = Quaternion.Euler(-90f, 0f, 0f);
-        tile.transform.localScale = Vector3.one * (cellSize * tileScaleRatio);
+    //    GameObject tile = GameObject.CreatePrimitive(PrimitiveType.Quad);
+    //    tile.name = $"Tile_{cell.x}_{cell.y}";
+    //    tile.transform.SetParent(transform);
+    //    tile.transform.position = tilePos;
+    //    tile.transform.rotation = Quaternion.Euler(-90f, 0f, 0f);
+    //    tile.transform.localScale = Vector3.one * (cellSize * tileScaleRatio);
 
-        Collider col = tile.GetComponent<Collider>();
-        if (col != null)
-        {
-            Destroy(col);
-        }
+    //    Collider col = tile.GetComponent<Collider>();
+    //    if (col != null)
+    //    {
+    //        Destroy(col);
+    //    }
 
-        Renderer r = tile.GetComponent<Renderer>();
-        if (r != null)
-        {
-            Material baseMat = GetOrCreateTileMaterial();
-            if (baseMat != null)
-            {
-                r.material = new Material(baseMat);
-            }
-            ApplyColorToRenderer(r, tileColor);
-            tileRenderers[cell] = r;
-        }
+    //    Renderer r = tile.GetComponent<Renderer>();
+    //    if (r != null)
+    //    {
+    //        Material baseMat = GetOrCreateTileMaterial();
+    //        if (baseMat != null)
+    //        {
+    //            r.material = new Material(baseMat);
+    //        }
+    //        ApplyColorToRenderer(r, tileColor);
+    //        tileRenderers[cell] = r;
+    //    }
 
-        spawnedTiles.Add(tile);
-        tileLookup[cell] = tile;
-    }
+    //    spawnedTiles.Add(tile);
+    //    tileLookup[cell] = tile;
+    //}
 
     public void ClearGrid()
     {
@@ -199,26 +200,169 @@ public class GridManager : MonoBehaviour
         }
     }
 
-    public Vector2Int GetGridPosition(Vector3 worldPos)
+    //SQUARE MAP: Phazed out for test
+    //public Vector2Int GetGridPosition(Vector3 worldPos)
+    //{
+    //    int x = Mathf.FloorToInt((worldPos.x - gridOrigin.x) / cellSize);
+    //    int y = Mathf.FloorToInt((worldPos.z - gridOrigin.z) / cellSize);
+    //    return new Vector2Int(x, y);
+    //}
+
+    //SQUARE MAP: Phazed out for test
+    //public Vector3 GetCellCenterWorld(Vector2Int cell)
+    //{
+    //    float y = cellGroundHeights.TryGetValue(cell, out float recordedY)
+    //        ? recordedY
+    //        : gridOrigin.y;
+
+    //    return new Vector3(
+    //        gridOrigin.x + (cell.x + 0.5f) * cellSize,
+    //        y,
+    //        gridOrigin.z + (cell.y + 0.5f) * cellSize
+    //    );
+    //}
+
+    //HEX TEST START
+    private float GetHexRadius()
     {
-        int x = Mathf.FloorToInt((worldPos.x - gridOrigin.x) / cellSize);
-        int y = Mathf.FloorToInt((worldPos.z - gridOrigin.z) / cellSize);
-        return new Vector2Int(x, y);
+        return cellSize * 0.5f * tileScaleRatio;
+    }
+
+    private float GetHexWidth(float radius)
+    {
+        return Mathf.Sqrt(3f) * radius;
+    }
+
+    private float GetRowStep(float radius)
+    {
+        return 1.5f * radius;
     }
 
     public Vector3 GetCellCenterWorld(Vector2Int cell)
     {
+        float radius = GetHexRadius();
+        float hexWidth = GetHexWidth(radius);
+        float rowStep = GetRowStep(radius);
+        float rowOffset = (cell.y % 2 == 1) ? hexWidth * 0.5f : 0f;
+
         float y = cellGroundHeights.TryGetValue(cell, out float recordedY)
             ? recordedY
             : gridOrigin.y;
 
         return new Vector3(
-            gridOrigin.x + (cell.x + 0.5f) * cellSize,
+            gridOrigin.x + cell.x * hexWidth + rowOffset + hexWidth * 0.5f,
             y,
-            gridOrigin.z + (cell.y + 0.5f) * cellSize
+            gridOrigin.z + cell.y * rowStep + radius
         );
     }
 
+    public Vector2Int GetGridPosition(Vector3 worldPos)
+    {
+        float radius = GetHexRadius();
+        float hexWidth = GetHexWidth(radius);
+        float rowStep = GetRowStep(radius);
+
+        int approxRow = Mathf.Clamp(
+            Mathf.RoundToInt((worldPos.z - gridOrigin.z - radius) / rowStep),
+            0,
+            height - 1
+        );
+
+        float rowOffset = (approxRow % 2 == 1) ? hexWidth * 0.5f : 0f;
+        int approxCol = Mathf.Clamp(
+            Mathf.RoundToInt((worldPos.x - gridOrigin.x - rowOffset - hexWidth * 0.5f) / hexWidth),
+            0,
+            width - 1
+        );
+
+        // Check candidate cells around the approximate hit and pick the closest hex center on XZ
+        Vector2Int bestCell = new Vector2Int(approxCol, approxRow);
+        float bestDistSq = float.MaxValue;
+
+        for (int dy = -1; dy <= 1; dy++)
+        {
+            for (int dx = -1; dx <= 1; dx++)
+            {
+                Vector2Int candidate = new Vector2Int(approxCol + dx, approxRow + dy);
+                if (candidate.x < 0 || candidate.x >= width || candidate.y < 0 || candidate.y >= height)
+                    continue;
+
+                Vector3 center = GetCellCenterWorld(candidate);
+                float distSq = (worldPos.x - center.x) * (worldPos.x - center.x) +
+                               (worldPos.z - center.z) * (worldPos.z - center.z);
+
+                if (distSq < bestDistSq)
+                {
+                    bestDistSq = distSq;
+                    bestCell = candidate;
+                }
+            }
+        }
+
+        return bestCell;
+    }
+
+    private void CreateTileVisual(Vector2Int cell, float groundY)
+    {
+        float radius = GetHexRadius();
+        Vector3 center = GetCellCenterWorld(cell);
+        Vector3 tilePos = new Vector3(center.x, groundY + tileHeightOffset, center.z);
+
+        GameObject tile = new GameObject($"HexTile_{cell.x}_{cell.y}");
+        tile.transform.SetParent(transform);
+        tile.transform.position = tilePos;
+        tile.transform.rotation = Quaternion.identity;
+
+        MeshFilter mf = tile.AddComponent<MeshFilter>();
+        mf.sharedMesh = CreatePointyHexMesh(radius * 0.94f); // Slight gap between hexes
+
+        MeshRenderer mr = tile.AddComponent<MeshRenderer>();
+        Material baseMat = GetOrCreateTileMaterial();
+        if (baseMat != null)
+        {
+            mr.material = new Material(baseMat);
+        }
+
+        ApplyColorToRenderer(mr, tileColor);
+        tileRenderers[cell] = mr;
+
+        spawnedTiles.Add(tile);
+        tileLookup[cell] = tile;
+    }
+
+    private Mesh CreatePointyHexMesh(float radius)
+    {
+        Mesh mesh = new Mesh { name = "PointyHexMesh" };
+
+        Vector3[] vertices = new Vector3[7];
+        vertices[0] = Vector3.zero;
+
+        // Pointy-top angles start at 30 degrees and step by 60 degrees
+        for (int i = 0; i < 6; i++)
+        {
+            float angleRad = Mathf.Deg2Rad * (30f + 60f * i);
+            vertices[i + 1] = new Vector3(
+                radius * Mathf.Cos(angleRad),
+                0f,
+                radius * Mathf.Sin(angleRad)
+            );
+        }
+
+        int[] triangles = new int[18];
+        for (int i = 0; i < 6; i++)
+        {
+            int next = (i == 5) ? 1 : i + 2;
+            triangles[i * 3 + 0] = 0;
+            triangles[i * 3 + 1] = next;
+            triangles[i * 3 + 2] = i + 1;
+        }
+
+        mesh.vertices = vertices;
+        mesh.triangles = triangles;
+        mesh.RecalculateNormals();
+        return mesh;
+    }
+    //HEX TEST END
     public bool IsCellBlocked(Vector2Int cell)
     {
         if (cell.x < 0 || cell.x >= width || cell.y < 0 || cell.y >= height)
