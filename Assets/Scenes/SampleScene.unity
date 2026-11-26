@@ -133,6 +133,7 @@ GameObject:
   - component: {fileID: 170803150}
   - component: {fileID: 170803149}
   - component: {fileID: 170803148}
+  - component: {fileID: 170803154}
   m_Layer: 6
   m_Name: Enemy
   m_TagString: Untagged
@@ -173,7 +174,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8270594bab4f4204484f83d5a44331d4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EnemyAggro
-  detectionRadius: 3
+  detectionRadius: 0
 --- !u!65 &170803150
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -267,6 +268,21 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &170803154
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 170803147}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 36b5b86fe6a91fd479332a2b9297f2bf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyGridAI
+  moveSpeed: 5.5
+  defaultMovementRange: 4
+  allowDiagonalSteps: 0
 --- !u!1 &330585543
 GameObject:
   m_ObjectHideFlags: 0
